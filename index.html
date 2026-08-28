@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NAFIJ • Android Manager</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Segoe UI,Arial;background:#070812;color:#eef1ff}
+body:before{content:"";position:fixed;inset:-20%;background:radial-gradient(circle at 15% 20%,#6d38ff33,transparent 30%),radial-gradient(circle at 85% 80%,#00d9ff22,transparent 30%);filter:blur(20px);z-index:-1}
+.wrap{max-width:1200px;margin:auto;padding:28px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+h1{margin:0}.muted{color:#9da5c7}.card{background:#0d1020dd;border:1px solid #ffffff15;border-radius:20px;padding:18px;box-shadow:0 18px 50px #0005;backdrop-filter:blur(15px)}
+.grid{display:grid;grid-template-columns:270px 1fr;gap:18px}.buttons,.files{display:grid;gap:8px}
+.folder,.btn{padding:11px 14px;border-radius:11px;border:1px solid #ffffff18;background:#ffffff09;color:white;cursor:pointer}
+.folder{text-align:left}.folder:hover{background:#7657ff33}.actions{display:flex;gap:8px;flex-wrap:wrap;margin:15px 0}
+.file{display:flex;justify-content:space-between;padding:12px;background:#ffffff07;border-radius:11px}
+input{width:100%;padding:12px;background:#080a14;color:white;border:1px solid #ffffff18;border-radius:10px;margin:8px 0}
+.hidden{display:none}@media(max-width:800px){.grid{grid-template-columns:1fr}.top{flex-direction:column;align-items:flex-start;gap:10px}}
+</style></head><body>
+<div class="wrap">
+<div class="top"><div><h1>⚡ NAFIJ Android Manager</h1><div class="muted">Hosted frontend • Termux backend</div></div><b id="status">● Not connected</b></div>
+<div class="card" id="login"><h3>Connect to device</h3>
+<input id="api" placeholder="https://your-secure-tunnel.example.com">
+<input id="token" type="password" placeholder="API token">
+<button class="btn" onclick="connect()">Connect</button></div>
+<div class="grid hidden" id="app"><aside class="card"><h3>Folders</h3><div class="buttons" id="folders"></div></aside>
+<main class="card"><div id="title"><h2>Welcome</h2><div class="muted">Select a folder.</div></div>
+<div class="actions"><button class="btn" onclick="device()">📱 Device Info</button><button class="btn" onclick="custom()">✏️ Custom Path</button></div>
+<div id="info"></div><div class="files" id="files"></div></main></div></div>
+<div id="modal" class="card hidden" style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(500px,90%)">
+<h3>Custom Path</h3><input id="path" placeholder="/sdcard/Download/MyFolder/"><button class="btn" onclick="addCustom()">Add</button>
+<button class="btn" onclick="closeModal()">Cancel</button></div>
+<script>
+let BASE="",TOKEN="",current="";
+const $=id=>document.getElementById(id);
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+async function api(path,opt={}){opt.headers={...(opt.headers||{}),Authorization:"Bearer "+TOKEN};let r=await fetch(BASE+path,opt),j=await r.json();if(!r.ok)throw Error(j.error||"Request failed");return j}
+async function connect(){try{BASE=$("api").value.trim().replace(/\/+$/,"");TOKEN=$("token").value.trim();await api("/api/health");$("login").classList.add("hidden");$("app").classList.remove("hidden");$("status").textContent="● Connected";loadFolders()}catch(e){alert(e.message)}}
+async function loadFolders(){let x=await api("/api/folders");$("folders").innerHTML=x.map(f=>`<button class="folder" onclick="openFolder('${esc(f.name)}')">${f.exists?"📁":"⚠️"} ${esc(f.name)}</button>`).join("")}
+async function openFolder(n){current=n;let x=await api("/api/files?folder="+encodeURIComponent(n));$("title").innerHTML=`<h2>📂 ${esc(x.folder)}</h2><div class="muted">${esc(x.path)} • ${x.count} files</div>`;$("files").innerHTML=x.files.length?x.files.map(f=>`<div class="file"><span>📄 ${esc(f.name)}</span><span class="muted">${f.size_text}</span></div>`).join(""):"<div class='muted'>No files found.</div>"}
+async function device(){let x=await api("/api/device");$("info").innerHTML=`<div class="file"><span>📱 Model</span><b>${esc(x.model)}</b></div><div class="file"><span>🤖 Android</span><b>${esc(x.android)}</b></div><div class="file"><span>📊 API</span><b>${esc(x.api)}</b></div>`}
+function custom(){$("modal").classList.remove("hidden")}function closeModal(){$("modal").classList.add("hidden")}
+async function addCustom(){try{let x=await api("/api/custom",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({path:$("path").value})});closeModal();loadFolders();openFolder(x.name)}catch(e){alert(e.message)}}
+</script></body></html>
